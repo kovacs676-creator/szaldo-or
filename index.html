@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SzaldóŐr (Béta Teszt) — Meddig fűthetek elektromos kazánnal és mikor váltsak gázra?</title>
+  <meta name="description" content="Add meg az elektromos kazánod teljesítményét (kW), modulációját és napi üzemidejét: kiszámoljuk, melyik napon és milyen villanyóra-állásnál kell átkapcsolnod gázkazánra.">
+  <style>
+    :root {
+      --bg-page: hsl(210, 25%, 97%);
+      --bg-surface: hsl(0, 0%, 100%);
+      --bg-subtle: hsl(210, 22%, 94%);
+      --border-color: hsl(214, 20%, 86%);
+      --text-main: hsl(215, 28%, 14%);
+      --text-muted: hsl(215, 16%, 44%);
+      --primary: hsl(205, 84%, 38%);
+      --primary-hover: hsl(205, 84%, 32%);
+      --primary-fg: hsl(0, 0%, 100%);
+      --success: hsl(152, 68%, 32%);
+      --warning: hsl(36, 88%, 38%);
+      --danger: hsl(0, 74%, 46%);
+      --radius-lg: 12px;
+      --radius-md: 8px;
+      --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06);
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      background-color: var(--bg-page);
+      color: var(--text-main);
+      color-scheme: light;
+      font-family: var(--font-sans);
+      line-height: 1.5;
+      font-size: 14px;
+      -webkit-font-smoothing: antialiased;
+    }
+    .app-container { max-width: 1180px; margin: 0 auto; padding: 20px 16px 48px; }
+    .app-header {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+      gap: 16px; padding-bottom: 18px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color);
+    }
+    .brand-row { display: flex; align-items: center; gap: 12px; }
+    .brand-badge {
+      width: 36px; height: 36px; border-radius: var(--radius-md);
+      background-color: var(--primary); color: var(--primary-fg);
+      display: inline-flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 18px;
+    }
+    h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; }
+    .subtitle { color: var(--text-muted); font-size: 0.85rem; margin-top: 2px; }
+    .header-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .layout-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
+    @media (min-width: 960px) { .layout-grid { grid-template-columns: 420px 1fr; } }
+    .card {
+      background: var(--bg-surface); border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg); padding: 18px; box-shadow: var(--shadow-sm);
+    }
+    .card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding-bottom: 10px; margin-bottom: 14px; border-bottom: 1px solid var(--border-color);
+    }
+    .card-title {
+      font-size: 0.78rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--text-muted);
+    }
+    .stack { display: flex; flex-direction: column; gap: 16px; }
+    .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    label { display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; }
+    select, input[type="number"], input[type="text"], input[type="email"], input[type="tel"] {
+      width: 100%; padding: 8px 10px; border: 1px solid var(--border-color);
+      border-radius: var(--radius-md); background: var(--bg-page);
+      color: var(--text-main); font-size: 0.85rem; font-family: inherit;
+    }
+    input[type="range"] { width: 100%; accent-color: var(--primary); cursor: pointer; }
+    .range-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 4px; font-size: 0.82rem;
+    }
+    .mono-val { font-family: var(--font-mono); font-weight: 600; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    @media (min-width: 640px) { .kpi-grid { grid-template-columns: repeat(4, 1fr); } }
+    .kpi-box {
+      background: var(--bg-surface); border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg); padding: 14px; box-shadow: var(--shadow-sm);
+    }
+    .kpi-label { font-size: 0.78rem; color: var(--text-muted); }
+    .kpi-number { font-family: var(--font-mono); font-size: 1.15rem; font-weight: 700; margin-top: 4px; }
+    .kpi-sub { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
+    .btn-primary {
+      background: var(--primary); color: var(--primary-fg); border: none;
+      border-radius: var(--radius-md); padding: 8px 14px; font-size: 0.82rem;
+      font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-secondary {
+      background: var(--bg-surface); color: var(--text-main);
+      border: 1px solid var(--border-color); border-radius: var(--radius-md);
+      padding: 7px 12px; font-size: 0.8rem; font-weight: 500; cursor: pointer;
+    }
+    .btn-secondary:hover { border-color: var(--primary); }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+    th, td { padding: 9px 10px; border-bottom: 1px solid var(--border-color); }
+    th { text-align: left; color: var(--text-muted); font-weight: 600; }
+    td.num, th.num { text-align: right; font-family: var(--font-mono); }
+    .hidden { display: none !important; }
+    @media print {
+      body { background: #fff !important; }
+      .no-print { display: none !important; }
+      .layout-grid { display: block !important; }
+      .card, .kpi-box { box-shadow: none !important; border: 1px solid #ccc !important; margin-bottom: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app-container">
+    <header class="app-header">
+      <div class="brand-row">
+        <span class="brand-badge">⚡</span>
+        <div>
+          <h1>SzaldóŐr <span style="font-size: 0.75rem; background: var(--bg-subtle); border: 1px solid var(--primary); color: var(--primary); padding: 2px 8px; border-radius: 6px; vertical-align: middle;">BÉTA TESZT</span></h1>
+          <p class="subtitle">Állítsd be a saját napelemedet és fűtésedet, majd az oldal alján küldd el 1 kattintással a véleményedet!</p>
+        </div>
+      </div>
+      <div class="header-actions no-print">
+        <button id="shareUrlBtn" class="btn-secondary" type="button">🔗 Beállításaim másolása linkként</button>
+        <button id="printPdfBtn" class="btn-secondary" type="button">🖨️ PDF Ellenőrzőlap</button>
+      </div>
+    </header>
+    <div id="shareUrlNotice" class="card hidden no-print" style="margin-bottom: 16px; border-color: var(--success); color: var(--success); font-weight: 600;">
+      ✅ A saját beállításaidat tartalmazó link a vágólapra került! Bárkinek elküldheted.
+    </div>
+    <!-- HERO SWITCHOVER ANSWER CARD -->
+    <section class="card stack" style="border: 2px solid var(--primary); margin-bottom: 20px;" aria-label="Átkapcsolási javaslat">
+      <div class="layout-grid" style="align-items: center;">
+        <div class="stack" style="gap: 8px;">
+          <div>
+            <span id="heroModeBadge" style="background: var(--primary); color: #fff; padding: 3px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 600;">🔥+⚡ 9 kW Elektromos kazán (80%) + Gázkazán</span>
+          </div>
+          <h2 id="heroHeadlineText" style="font-size: 1.25rem; line-height: 1.35;">Február 4.-ig fűthetsz 100%-ban az elektromos kazánnal 0 Ft-ért, utána kapcsolj át a gázkazánra!</h2>
+          <p id="heroSubText" style="color: var(--text-muted); font-size: 0.85rem;">A fordulónapig 4875 kWh ingyenes kereted van, ami 7.2 kW effektív kazánteljesítménnyel 677 üzemórára (96 fűtési napra) elég.</p>
+        </div>
+        <div class="card" style="background: var(--bg-page);">
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <strong>📟 Átkapcsolási villanyóra-egyenleg (2.8.0 – 1.8.0):</strong>
+            <span id="heroSwitchMeterVal" class="mono-val" style="font-size: 1.2rem; color: var(--success);">-1194 kWh</span>
+          </div>
+          <p id="heroSpringNote" style="color: var(--text-muted); font-size: 0.8rem; margin-top: 6px;">Ne ijedj meg a mínusztól! Amikor a (2.8.0 – 1.8.0) egyenleg eléri a -1194 kWh-t, válts gázra: a tavaszi napsütés a fordulónapig pont 0 Ft-ra tölti vissza az órát!</p>
+        </div>
+      </div>
+      <div class="kpi-grid" style="padding-top: 10px; border-top: 1px solid var(--border-color);">
+        <div class="kpi-box">
+          <div class="kpi-label">1. Ingyenes szaldó keret (0 Ft)</div>
+          <div id="outFreePool" class="kpi-number">4875 kWh</div>
+          <div id="outFreeDays" class="kpi-sub">677 kazán-üzemóra (~96 nap)</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-label">2. Kiváltott földgáz (0 Ft-ért)</div>
+          <div id="outGasM3" class="kpi-number">~574 m³</div>
+          <div id="outGasFt" class="kpi-sub">~58 548 Ft rezsi gáz kiváltva</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-label">3. Ha a gázod rezsicsökkentett</div>
+          <div id="outRezsiGasAdvice" class="kpi-number" style="font-size: 0.95rem;">Válts gázra a fenti napon!</div>
+          <div id="outRezsiGasSub" class="kpi-sub">Gáz: 12 Ft/kWh hő vs. Kazán: 36,4 Ft</div>
+        </div>
+        <div class="kpi-box">
+          <div class="kpi-label">4. Ha kifutnál a gázkeretből (747 Ft/m³)</div>
+          <div id="outExtendedDate" class="kpi-number" style="font-size: 0.95rem; color: var(--warning);">Fűts tovább Április 23.-ig!</div>
+          <div class="kpi-sub">A 36,4 Ft-os áramkeret (-2523 kWh) feleannyi, mint a piaci gáz!</div>
+        </div>
+      </div>
+    </section>
+    <div class="layout-grid">
+      <!-- Left Inputs -->
+      <section class="stack no-print" aria-label="Bemeneti paraméterek">
+        <div class="card stack">
+          <div class="card-header">
+            <h2 class="card-title">1. Elektromos Kazán / Fűtés Paraméterei</h2>
+          </div>
+          <div>
+            <label for="heatingTypeSelect">Fűtési rendszered</label>
+            <select id="heatingTypeSelect">
+              <option value="boiler_gas" selected>🔥+⚡ Elektromos kazán + Gázkazán (COP 1.0)</option>
+              <option value="ac_gas">❄️+🔥 Hűtő-fűtő klímák + Gázkazán (SCOP 3.8)</option>
+              <option value="panel_only">🔌 Elektromos fűtőpanelek / Infra (COP 1.0)</option>
+            </select>
+          </div>
+          <div id="boilerParamsWrap" class="stack">
+            <div>
+              <div class="range-header">
+                <span>Kazán névleges teljesítménye</span>
+                <span id="boilerKwVal" class="mono-val">9.0 kW</span>
+              </div>
+              <input id="boilerKwInput" type="range" min="3" max="24" step="0.5" value="9">
+              <div id="boilerAmpsNote" class="kpi-sub">⚡ Max. áramfelvétel: ~3 × 13.0 A (3×16A kompatibilis)</div>
+            </div>
+            <div>
+              <div class="range-header">
+                <span>Teljesítményfokozat / Moduláció</span>
+                <span id="boilerModVal" class="mono-val">80% (7.2 kW)</span>
+              </div>
+              <input id="boilerModInput" type="range" min="30" max="100" step="5" value="80">
+            </div>
+            <div>
+              <div class="range-header">
+                <span>Napi fűtési üzemidő télen (termosztát szerint)</span>
+                <span id="boilerHoursVal" class="mono-val">6.5 óra/nap</span>
+              </div>
+              <input id="boilerHoursInput" type="range" min="1" max="18" step="0.5" value="6.5">
+            </div>
+          </div>
+          <div class="card" style="background: var(--bg-page); padding: 10px 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span>Számított téli napi áramigény:</span>
+              <strong id="computedDailyKwhVal" class="mono-val" style="color: var(--primary);">46.8 kWh/nap</strong>
+            </div>
+            <div id="maxHoursWholeWinterNote" class="kpi-sub" style="margin-top: 2px;">Ha egész télen átkapcsolás nélkül fűtenél: max. 4.2 óra/nap</div>
+          </div>
+        </div>
+        <div class="card stack">
+          <div class="card-header">
+            <h2 class="card-title">2. Napelemed és Fordulónapod</h2>
+          </div>
+          <div>
+            <div class="range-header">
+              <span>Napelem rendszer mérete</span>
+              <span id="kwpVal" class="mono-val">7.5 kWp</span>
+            </div>
+            <input id="kwpInput" type="range" min="2" max="20" step="0.5" value="7.5">
+          </div>
+          <div class="form-grid-2">
+            <div>
+              <label for="curMonth">Jelenlegi hónap</label>
+              <select id="curMonth">
+                <option value="9">Október</option>
+                <option value="10" selected>November</option>
+                <option value="11">December</option>
+                <option value="0">Január</option>
+                <option value="1">Február</option>
+                <option value="2">Március</option>
+              </select>
+            </div>
+            <div>
+              <label for="settleMonth">Elszámolási fordulónap</label>
+              <select id="settleMonth">
+                <option value="2">Március vége</option>
+                <option value="3" selected>Április vége</option>
+                <option value="4">Május vége</option>
+                <option value="5">Június vége</option>
+                <option value="8">Szeptember vége</option>
+                <option value="9">Október vége</option>
+                <option value="11">December vége</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <div class="range-header">
+              <span>Havi alapfogyasztás (fűtés nélkül)</span>
+              <span id="baseVal" class="mono-val">300 kWh/hó</span>
+            </div>
+            <input id="baseInput" type="range" min="150" max="700" step="10" value="300">
+          </div>
+        </div>
+        <div class="card stack">
+          <div class="card-header">
+            <h2 class="card-title">3. Jelenlegi Nyári Többleted</h2>
+            <span id="netSurplusTag" class="mono-val">+4073 kWh</span>
+          </div>
+          <div>
+            <label for="surplusSourceSelect">Hogyan számoljuk a jelenlegi többletet?</label>
+            <select id="surplusSourceSelect">
+              <option value="auto" selected>🛋️ Automatikus becslés (Kanapé-mód, óra nélkül)</option>
+              <option value="app">📱 Inverter Appban látott idei termelésből</option>
+              <option value="meter">📟 Villanyóra 1.8.0 és 2.8.0 állásából (Pontos)</option>
+            </select>
+          </div>
+          <div id="appInputWrap" class="hidden">
+            <label for="appGrossInput">Inverter Appban látott termelés a fordulónap óta (kWh)</label>
+            <input id="appGrossInput" type="number" value="6200">
+          </div>
+          <div id="meterInputWrap" class="form-grid-2 hidden">
+            <div>
+              <label for="m180Prev">1.8.0 Előző számlán</label>
+              <input id="m180Prev" type="number" value="11200">
+            </div>
+            <div>
+              <label for="m180Curr">1.8.0 Mai állás</label>
+              <input id="m180Curr" type="number" value="12650">
+            </div>
+            <div>
+              <label for="m280Prev">2.8.0 Előző számlán</label>
+              <input id="m280Prev" type="number" value="16400">
+            </div>
+            <div>
+              <label for="m280Curr">2.8.0 Mai állás</label>
+              <input id="m280Curr" type="number" value="20350">
+            </div>
+          </div>
+        </div>
+      </section>
+      <!-- Right Dashboard -->
+      <section class="stack" aria-label="Átkapcsolási grafikon, havi menetrend és visszajelzés">
+        <div class="card stack">
+          <div class="card-header">
+            <h2 class="card-title">Villanykazán → Gázkazán Átkapcsolási Görbe és Tavaszi Visszatöltés</h2>
+          </div>
+          <canvas id="trajCanvas" style="width: 100%; height: 225px; display: block;"></canvas>
+        </div>
+        <div class="card stack">
+          <div class="card-header">
+            <h2 class="card-title">Havi Fűtési Menetrend: Kazán Üzemórák és Villanyóra Cél-Egyenlegek</h2>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Hónap</th>
+                  <th>Melyik fűtés menjen?</th>
+                  <th class="num">Kazán óra</th>
+                  <th class="num">Villanyfűtés</th>
+                  <th class="num">PV – Alap</th>
+                  <th class="num">Cél egyenleg (2.8.0–1.8.0)</th>
+                </tr>
+              </thead>
+              <tbody id="planTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <!-- Beta Tester Feedback Box -->
+        <div class="card stack no-print" style="border: 2px solid var(--primary);">
+          <div class="card-header">
+            <h2 class="card-title" style="color: var(--primary);">🧪 Tesztelői Visszajelzés (20 másodperc)</h2>
+          </div>
+          <div class="form-grid-2">
+            <div>
+              <label for="fbClarity">1. Mennyire volt érthető első ránézésre?</label>
+              <select id="fbClarity">
+                <option value="Egyértelmű és könnyen érthető">👍 Egyértelmű és könnyen érthető</option>
+                <option value="Kicsit gondolkodni kellett rajta">🤔 Kicsit gondolkodni kellett rajta</option>
+                <option value="Nem volt világos, mit kell nézni">❓ Nem volt világos, mit kell nézni</option>
+              </select>
+            </div>
+            <div>
+              <label for="fbRealism">2. Reálisnak tűnik a kijött átkapcsolási dátum?</label>
+              <select id="fbRealism">
+                <option value="Igen, kb. így alakul nálam is">✅ Igen, kb. így alakul nálam is</option>
+                <option value="Túl soknak tűnik az ingyenes keret">⚠️ Túl soknak tűnik az ingyenes keret</option>
+                <option value="Túl kevésnek tűnik az ingyenes keret">⚠️ Túl kevésnek tűnik az ingyenes keret</option>
+                <option value="Most fűtök először így">🆕 Most fűtök először így</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label for="fbNote">3. Mi hiányzik, vagy mi tenné még hasznosabbá? (opcionális)</label>
+            <input id="fbNote" type="text" placeholder="Pl. Jó lenne, ha a villanybojlert is külön be lehetne állítani...">
+          </div>
+          <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;">
+            <button id="copyFeedbackBtn" type="button" class="btn-primary">
+              📋 Visszajelzés + Beállításaim Másolása (Messenger / E-mail küldéshez)
+            </button>
+            <span id="fbCopiedNotice" class="hidden" style="color: var(--success); font-weight: 600;">
+              ✅ Vágólapra másolva! Csak illeszd be (Ctrl+V) Messengerbe vagy e-mailbe!
+            </span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script>
+    function copyTextReliable(text) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); } catch (_) {}
+      document.body.removeChild(ta);
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).catch(() => {});
+      }
+    }
+    const MONTH_DATA = [
+      { idx: 0,  name: 'Január',     short: 'Jan',  days: 31, pvShare: 0.028, hddWeight: 1.25 },
+      { idx: 1,  name: 'Február',    short: 'Feb',  days: 28, pvShare: 0.049, hddWeight: 1.10 },
+      { idx: 2,  name: 'Március',    short: 'Márc', days: 31, pvShare: 0.088, hddWeight: 0.70 },
+      { idx: 3,  name: 'Április',    short: 'Ápr',  days: 30, pvShare: 0.112, hddWeight: 0.25 },
+      { idx: 4,  name: 'Május',      short: 'Máj',  days: 31, pvShare: 0.131, hddWeight: 0.00 },
+      { idx: 5,  name: 'Június',     short: 'Jún',  days: 30, pvShare: 0.140, hddWeight: 0.00 },
+      { idx: 6,  name: 'Július',     short: 'Júl',  days: 31, pvShare: 0.144, hddWeight: 0.00 },
+      { idx: 7,  name: 'Augusztus',  short: 'Aug',  days: 31, pvShare: 0.130, hddWeight: 0.00 },
+      { idx: 8,  name: 'Szeptember', short: 'Szep', days: 30, pvShare: 0.094, hddWeight: 0.00 },
+      { idx: 9,  name: 'Október',    short: 'Okt',  days: 31, pvShare: 0.054, hddWeight: 0.45 },
+      { idx: 10, name: 'November',   short: 'Nov',  days: 30, pvShare: 0.018, hddWeight: 0.85 },
+      { idx: 11, name: 'December',   short: 'Dec',  days: 31, pvShare: 0.012, hddWeight: 1.15 }
+    ];
+    let lastSnapshot = {};
+    function getSequence(startIdx, endIdx) {
+      const seq = [];
+      let c = startIdx;
+      for (let i = 0; i < 12; i++) {
+        seq.push(MONTH_DATA[c]);
+        if (c === endIdx && i > 0) break;
+        c = (c + 1) % 12;
+      }
+      return seq;
+    }
+    function estimateAutoSurplus(settleMonth, curMonth, kwp, baseMonthly) {
+      const annualYield = kwp * 1130;
+      let m = (settleMonth + 1) % 12;
+      let net = 0;
+      let guard = 0;
+      while (m !== curMonth && guard < 12) {
+        net += (annualYield * MONTH_DATA[m].pvShare - baseMonthly);
+        m = (m + 1) % 12;
+        guard++;
+      }
+      return Math.max(0, Math.round(net));
+    }
+    function buildShareUrl() {
+      const params = new URLSearchParams({
+        type: document.getElementById('heatingTypeSelect').value,
+        bkw: document.getElementById('boilerKwInput').value,
+        bmod: document.getElementById('boilerModInput').value,
+        bhrs: document.getElementById('boilerHoursInput').value,
+        pv: document.getElementById('kwpInput').value,
+        cur: document.getElementById('curMonth').value,
+        settle: document.getElementById('settleMonth').value,
+        base: document.getElementById('baseInput').value,
+        src: document.getElementById('surplusSourceSelect').value
+      });
+      return window.location.origin + window.location.pathname + '?' + params.toString();
+    }
+    function loadFromUrlParams() {
+      const q = new URLSearchParams(window.location.search);
+      if (q.has('type')) document.getElementById('heatingTypeSelect').value = q.get('type');
+      if (q.has('bkw')) document.getElementById('boilerKwInput').value = q.get('bkw');
+      if (q.has('bmod')) document.getElementById('boilerModInput').value = q.get('bmod');
+      if (q.has('bhrs')) document.getElementById('boilerHoursInput').value = q.get('bhrs');
+      if (q.has('pv')) document.getElementById('kwpInput').value = q.get('pv');
+      if (q.has('cur')) document.getElementById('curMonth').value = q.get('cur');
+      if (q.has('settle')) document.getElementById('settleMonth').value = q.get('settle');
+      if (q.has('base')) document.getElementById('baseInput').value = q.get('base');
+      if (q.has('src')) document.getElementById('surplusSourceSelect').value = q.get('src');
+    }
+    function updateApp() {
+      const heatingType = document.getElementById('heatingTypeSelect').value;
+      const scop = heatingType === 'ac_gas' ? 3.8 : 1.0;
+      const nominalKw = parseFloat(document.getElementById('boilerKwInput').value);
+      const modPct = parseFloat(document.getElementById('boilerModInput').value);
+      const hoursPerDay = parseFloat(document.getElementById('boilerHoursInput').value);
+      const effectiveKw = nominalKw * (modPct / 100.0);
+      const dailyWinterDemand = effectiveKw * hoursPerDay;
+      const ampsPerPhase = (nominalKw * 1000) / (3 * 230);
+      document.getElementById('boilerKwVal').textContent = `${nominalKw.toFixed(1)} kW`;
+      document.getElementById('boilerModVal').textContent = `${modPct}% (${effectiveKw.toFixed(1)} kW)`;
+      document.getElementById('boilerHoursVal').textContent = `${hoursPerDay.toFixed(1)} óra/nap`;
+      document.getElementById('computedDailyKwhVal').textContent = `${dailyWinterDemand.toFixed(1)} kWh/nap`;
+      let breakerText = '3×16A kompatibilis';
+      if (ampsPerPhase > 16 && ampsPerPhase <= 20) breakerText = 'min. 3×20A szükséges';
+      else if (ampsPerPhase > 20 && ampsPerPhase <= 25) breakerText = 'min. 3×25A szükséges';
+      else if (ampsPerPhase > 25) breakerText = 'min. 3×32A szükséges';
+      document.getElementById('boilerAmpsNote').textContent =
+        `⚡ Max. áramfelvétel: ~3 × ${ampsPerPhase.toFixed(1)} A (${breakerText})`;
+      const curMonth = parseInt(document.getElementById('curMonth').value, 10);
+      const settleMonth = parseInt(document.getElementById('settleMonth').value, 10);
+      const kwp = parseFloat(document.getElementById('kwpInput').value);
+      const baseMonthly = parseFloat(document.getElementById('baseInput').value);
+      const srcMode = document.getElementById('surplusSourceSelect').value;
+      document.getElementById('appInputWrap').classList.toggle('hidden', srcMode !== 'app');
+      document.getElementById('meterInputWrap').classList.toggle('hidden', srcMode !== 'meter');
+      let startSurplus = 0;
+      if (srcMode === 'auto') {
+        startSurplus = estimateAutoSurplus(settleMonth, curMonth, kwp, baseMonthly);
+      } else if (srcMode === 'app') {
+        const gross = parseFloat(document.getElementById('appGrossInput').value) || 0;
+        let elapsed = (curMonth - settleMonth + 12) % 12;
+        if (elapsed === 0) elapsed = 6;
+        startSurplus = Math.round(gross - elapsed * baseMonthly);
+      } else {
+        const m180P = parseFloat(document.getElementById('m180Prev').value) || 0;
+        const m180C = parseFloat(document.getElementById('m180Curr').value) || 0;
+        const m280P = parseFloat(document.getElementById('m280Prev').value) || 0;
+        const m280C = parseFloat(document.getElementById('m280Curr').value) || 0;
+        startSurplus = Math.round(Math.max(0, m280C - m280P) - Math.max(0, m180C - m180P));
+      }
+      document.getElementById('kwpVal').textContent = `${kwp.toFixed(1)} kWp`;
+      document.getElementById('netSurplusTag').textContent = `${startSurplus >= 0 ? '+' : ''}${startSurplus} kWh`;
+      document.getElementById('baseVal').textContent = `${baseMonthly} kWh/hó`;
+      const badgeText = `🔥+⚡ ${nominalKw} kW Elektromos kazán (${modPct}%) + Gázkazán`;
+      document.getElementById('heroModeBadge').textContent = badgeText;
+      const seq = getSequence(curMonth, settleMonth);
+      const annualYield = kwp * 1130;
+      let remPv = 0;
+      let remBase = 0;
+      let weightedDays = 0;
+      seq.forEach((m) => {
+        remPv += Math.round(annualYield * m.pvShare);
+        remBase += Math.round(baseMonthly);
+        weightedDays += m.days * m.hddWeight;
+      });
+      const freeBudgetKwh = Math.max(0, startSurplus + remPv - remBase);
+      const extendedBudgetKwh = freeBudgetKwh + 2523;
+      const totalFreeBoilerHours = effectiveKw > 0 ? Math.round(freeBudgetKwh / effectiveKw) : 0;
+      const maxHoursWholeWinter = (weightedDays > 0 && effectiveKw > 0)
+        ? (freeBudgetKwh / weightedDays / effectiveKw)
+        : 0;
+      document.getElementById('maxHoursWholeWinterNote').textContent =
+        `Ha egész télen átkapcsolás nélkül fűtenél: max. ${maxHoursWholeWinter.toFixed(1)} óra/nap`;
+      let remFree = freeBudgetKwh;
+      let remExt = extendedBudgetKwh;
+      let running = startSurplus;
+      let switchDateStr = null;
+      let switchMeterBal = null;
+      let extSwitchDateStr = null;
+      let elecDaysTotal = 0;
+      const points = [{ label: 'Most', balance: startSurplus, phase: 'elec' }];
+      const tbody = document.getElementById('planTableBody');
+      tbody.innerHTML = '';
+      seq.forEach((m) => {
+        const mPv = Math.round(annualYield * m.pvShare);
+        const mBase = Math.round(baseMonthly);
+        const dailyPv = mPv / m.days;
+        const dailyBase = mBase / m.days;
+        const dailyHeatNeed = dailyWinterDemand * m.hddWeight;
+        let mElecKwh = 0;
+        let mElecDays = 0;
+        let mGasDays = 0;
+        let switchedHere = false;
+        let switchDay = null;
+        for (let d = 1; d <= m.days; d++) {
+          let used = 0;
+          if (dailyHeatNeed > 0) {
+            if (remFree >= dailyHeatNeed) {
+              used = dailyHeatNeed;
+              remFree -= dailyHeatNeed;
+              mElecDays++;
+              elecDaysTotal++;
+            } else if (remFree > 0) {
+              used = remFree;
+              remFree = 0;
+              mElecDays++;
+              elecDaysTotal++;
+              if (!switchDateStr) {
+                switchDateStr = `${m.name} ${d}.`;
+                switchedHere = true;
+                switchDay = d;
+              }
+            } else {
+              if (!switchDateStr) {
+                switchDateStr = `${m.name} ${d}.`;
+                switchedHere = true;
+                switchDay = d;
+              }
+              mGasDays++;
+            }
+            if (remExt >= dailyHeatNeed) {
+              remExt -= dailyHeatNeed;
+            } else if (!extSwitchDateStr) {
+              extSwitchDateStr = `${m.name} ${d}.`;
+            }
+          }
+          mElecKwh += used;
+          running += (dailyPv - dailyBase - used);
+          if (switchedHere && switchDay === d && switchMeterBal === null) {
+            switchMeterBal = Math.round(running);
+          }
+        }
+        const endBal = Math.round(running);
+        const mBoilerHours = effectiveKw > 0 ? Math.round(mElecKwh / effectiveKw) : 0;
+        points.push({
+          label: m.short,
+          balance: endBal,
+          phase: mGasDays > mElecDays ? 'gas' : 'elec',
+          switchedHere,
+          switchText: switchedHere ? `Átkapcsolás: ${switchDateStr}` : null
+        });
+        let scheduleCell = '';
+        if (m.hddWeight === 0) {
+          scheduleCell = 'Nincs fűtés (Napelem tölt)';
+        } else if (mGasDays === 0) {
+          scheduleCell = `⚡ 100% Villanyfűtés (${m.days} nap)`;
+        } else if (mElecDays === 0) {
+          scheduleCell = `🔥 100% Gázkazán (${m.days} nap)`;
+        } else {
+          scheduleCell = `⚡ ${switchDay}.-ig Villany → 🔥 utána Gáz`;
+        }
+        const netPvBase = mPv - mBase;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>${m.name}</strong></td>
+          <td>${scheduleCell}</td>
+          <td class="num">${mBoilerHours} óra</td>
+          <td class="num">-${Math.round(mElecKwh)} kWh</td>
+          <td class="num">${netPvBase >= 0 ? '+' : ''}${netPvBase} kWh</td>
+          <td class="num"><strong>${endBal >= 0 ? '+' : ''}${endBal} kWh</strong></td>
+        `;
+        tbody.appendChild(tr);
+      });
+      if (!switchDateStr) {
+        document.getElementById('heroHeadlineText').textContent =
+          'Egész télen fűthetsz 100%-ban az elektromos kazánnal 0 Ft-ért — nem kell átkapcsolnod a gázkazánra!';
+        document.getElementById('heroSwitchMeterVal').textContent = `+${Math.round(running)} kWh`;
+        document.getElementById('heroSpringNote').textContent =
+          'A szaldó kereted a teljes téli fűtést fedezi a fordulónapig.';
+      } else {
+        document.getElementById('heroHeadlineText').textContent =
+          `${switchDateStr}-ig fűthetsz 100%-ban az elektromos kazánnal 0 Ft-ért, utána kapcsolj át a gázkazánra!`;
+        document.getElementById('heroSwitchMeterVal').textContent =
+          `${switchMeterBal >= 0 ? '+' : ''}${switchMeterBal} kWh`;
+        document.getElementById('heroSpringNote').textContent =
+          switchMeterBal < 0
+            ? `Ne ijedj meg a mínusztól! Amikor a (2.8.0 – 1.8.0) egyenleg eléri a ${switchMeterBal} kWh-t, válts gázra: a tavaszi napsütés a fordulónapig pont 0 Ft-ra tölti vissza az órát!`
+            : `Amikor a (2.8.0 – 1.8.0) többlet lecsökken +${switchMeterBal} kWh-ra, válts gázra, hogy a ház alapfogyasztása is 0 Ft maradjon a fordulónapig.`;
+      }
+      document.getElementById('heroSubText').textContent =
+        `A fordulónapig ${freeBudgetKwh.toLocaleString('hu-HU')} kWh ingyenes kereted van, ami ${effectiveKw.toFixed(1)} kW effektív kazánteljesítménnyel ${totalFreeBoilerHours} üzemórára (${elecDaysTotal} fűtési napra) elég.`;
+      document.getElementById('outFreePool').textContent = `${freeBudgetKwh.toLocaleString('hu-HU')} kWh`;
+      document.getElementById('outFreeDays').textContent = `${totalFreeBoilerHours} kazán-üzemóra (~${elecDaysTotal} nap)`;
+      const gasM3 = Math.round((freeBudgetKwh * scop) / 8.5);
+      document.getElementById('outGasM3').textContent = `~${gasM3.toLocaleString('hu-HU')} m³`;
+      document.getElementById('outGasFt').textContent = `~${(gasM3 * 102).toLocaleString('hu-HU')} Ft rezsi gáz kiváltva`;
+      document.getElementById('outExtendedDate').textContent =
+        extSwitchDateStr ? `Fűts tovább ${extSwitchDateStr}-ig!` : 'Egész télen fűthetsz villannyal!';
+      lastSnapshot = {
+        badgeText,
+        kwp,
+        settleName: MONTH_DATA[settleMonth].name,
+        startSurplus,
+        freeBudgetKwh,
+        totalFreeBoilerHours,
+        switchDateStr: switchDateStr || 'Egész télen elég',
+        switchMeterBal: switchMeterBal !== null ? switchMeterBal : Math.round(running)
+      };
+      renderCanvas(points);
+    }
+    function renderCanvas(points) {
+      const canvas = document.getElementById('trajCanvas');
+      if (!canvas) return;
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      const ctx = canvas.getContext('2d');
+      ctx.scale(dpr, dpr);
+      const w = rect.width;
+      const h = rect.height;
+      const padL = 52;
+      const padR = 20;
+      const padT = 22;
+      const padB = 26;
+      const plotW = w - padL - padR;
+      const plotH = h - padT - padB;
+      const vals = points.map((p) => p.balance);
+      const maxY = Math.max(2500, ...vals, 500);
+      const minY = Math.min(-1200, ...vals, -600);
+      const yToPx = (v) => padT + ((maxY - v) / (maxY - minY)) * plotH;
+      const xToPx = (i) => padL + (i / Math.max(1, points.length - 1)) * plotW;
+      ctx.clearRect(0, 0, w, h);
+      ctx.font = '11px sans-serif';
+      const yZero = yToPx(0);
+      ctx.save();
+      ctx.strokeStyle = '#1a8952';
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(padL, yZero);
+      ctx.lineTo(w - padR, yZero);
+      ctx.stroke();
+      ctx.fillStyle = '#1a8952';
+      ctx.textAlign = 'right';
+      ctx.fillText('0 kWh (Ingyenes szaldó cél a fordulónapon)', w - padR - 4, yZero - 5);
+      ctx.restore();
+      for (let i = 0; i < points.length - 1; i++) {
+        ctx.strokeStyle = points[i + 1].phase === 'gas' ? '#b5730b' : '#1a8952';
+        ctx.lineWidth = 2.8;
+        ctx.beginPath();
+        ctx.moveTo(xToPx(i), yToPx(points[i].balance));
+        ctx.lineTo(xToPx(i + 1), yToPx(points[i + 1].balance));
+        ctx.stroke();
+      }
+      points.forEach((p, i) => {
+        const x = xToPx(i);
+        const y = yToPx(p.balance);
+        ctx.fillStyle = '#556575';
+        ctx.textAlign = 'center';
+        ctx.fillText(p.label, x, h - 8);
+        ctx.beginPath();
+        ctx.arc(x, y, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = p.phase === 'gas' ? '#b5730b' : '#1a8952';
+        ctx.fill();
+        if (p.switchedHere && p.switchText) {
+          ctx.fillStyle = '#1e293b';
+          ctx.font = 'bold 11px sans-serif';
+          ctx.fillText('🔥 ' + p.switchText, Math.min(w - 85, Math.max(85, x)), y - 10);
+        }
+      });
+    }
+    document.getElementById('printPdfBtn').addEventListener('click', () => window.print());
+    document.getElementById('shareUrlBtn').addEventListener('click', () => {
+      const url = buildShareUrl();
+      copyTextReliable(url);
+      const notice = document.getElementById('shareUrlNotice');
+      notice.classList.remove('hidden');
+      setTimeout(() => notice.classList.add('hidden'), 5000);
+    });
+    document.getElementById('copyFeedbackBtn').addEventListener('click', () => {
+      const clarity = document.getElementById('fbClarity').value;
+      const realism = document.getElementById('fbRealism').value;
+      const note = document.getElementById('fbNote').value || '(nincs megjegyzés)';
+      const url = buildShareUrl();
+      const text = [
+        '⚡ SzaldóŐr Béta Teszt Visszajelzés',
+        '-----------------------------------',
+        `• Rendszer: ${lastSnapshot.badgeText} | Napelem: ${lastSnapshot.kwp} kWp`,
+        `• Fordulónap: ${lastSnapshot.settleName} | Induló többlet: +${lastSnapshot.startSurplus} kWh`,
+        `• Ingyenes keret: ${lastSnapshot.freeBudgetKwh} kWh (${lastSnapshot.totalFreeBoilerHours} üzemóra)`,
+        `• Átkapcsolás gázra: ${lastSnapshot.switchDateStr} (óraállás: ${lastSnapshot.switchMeterBal} kWh)`,
+        '-----------------------------------',
+        `1. Érthetőség: ${clarity}`,
+        `2. Realitás: ${realism}`,
+        `3. Megjegyzés: ${note}`,
+        `🔗 Beállításaim linkje: ${url}`
+      ].join('\n');
+      copyTextReliable(text);
+      const notice = document.getElementById('fbCopiedNotice');
+      notice.classList.remove('hidden');
+      setTimeout(() => notice.classList.add('hidden'), 6000);
+    });
+    [
+      'heatingTypeSelect', 'boilerKwInput', 'boilerModInput', 'boilerHoursInput',
+      'curMonth', 'settleMonth', 'kwpInput', 'baseInput',
+      'surplusSourceSelect', 'appGrossInput', 'm180Prev', 'm180Curr', 'm280Prev', 'm280Curr'
+    ].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) {
+        el.addEventListener('input', updateApp);
+        el.addEventListener('change', updateApp);
+      }
+    });
+    window.addEventListener('resize', updateApp);
+    loadFromUrlParams();
+    updateApp();
+  </script>
+</body>
+</html>
